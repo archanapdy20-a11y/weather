@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Weather App</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{display:flex;min-height:100vh;align-items:center;justify-content:center;background:#eef2f7;margin:0;padding:20px}
+    .card{width:360px;background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(20,30,60,0.12);padding:18px}
+    h1{font-size:20px;margin:0 0 12px}
+    .search{display:flex;gap:8px;margin-bottom:12px}
+    input[type="text"]{flex:1;padding:10px;border-radius:8px;border:1px solid #d6dde6;font-size:14px}
+    button{padding:10px 12px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer}
+    .result{margin-top:12px}
+    .loading{opacity:0.7}
+    .error{color:#b91c1c}
+    .weather-row{display:flex;align-items:center;gap:12px}
+    .temp{font-size:40px;font-weight:700}
+    .meta{font-size:14px;color:#475569}
+    .small{font-size:12px;color:#64748b}
+    footer{margin-top:14px;font-size:12px;color:#94a3b8;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Weather Finder</h1>
+    <div class="search">
+      <input id="city" type="text" placeholder="Enter city (e.g., Chennai)" />
+      <button id="searchBtn">Search</button>
+    </div>
+
+    <div id="status" class="small">Powered by OpenWeatherMap (via backend)</div>
+
+    <div id="result" class="result" aria-live="polite"></div>
+
+    <footer>Tip: use city name (optionally: "city,country")</footer>
+  </div>
+
+  <script>
+    const btn = document.getElementById('searchBtn');
+    const cityInput = document.getElementById('city');
+    const resultDiv = document.getElementById('result');
+    const status = document.getElementById('status');
+
+    btn.addEventListener('click', fetchWeather);
+    cityInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') fetchWeather(); });
+
+    function showError(msg) {
+      resultDiv.innerHTML = `<div class="error">Error: ${escapeHtml(msg)}</div>`;
+    }
+
+    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    async function fetchWeather(){
+      const city = cityInput.value.trim();
+      if (!city) { showError('Please enter a city name.'); return; }
+      resultDiv.innerHTML = `<div class="small loading">Loading...</div>`;
+      try {
+        const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+        const text = await res.text();
+        if (!res.ok) {
+          // try to extract JSON error
+          try { const json = JSON.parse(text); throw new Error(json.message || json.error || text); } 
+          catch(_) { throw new Error(text || 'Unknown error'); }
+        }
+        const data = JSON.parse(text);
+        renderWeather(data);
+      } catch (err) {
+        showError(err.message || err);
+      }
+    }
+
+    function renderWeather(data){
+      // data structure from OpenWeatherMap current weather API
+      if (data?.cod && (data.cod === '404' || data.cod === 404)) {
+        showError(data.message || 'City not found');
+        return;
+      }
+      const name = data.name || '';
+      const country = data.sys?.country || '';
+      const temp = data.main?.temp ?? 'N/A';
+      const desc = data.weather?.[0]?.description || '';
+      const icon = data.weather?.[0]?.icon || '';
+      const humidity = data.main?.humidity ?? 'N/A';
+      const wind = data.wind?.speed ?? 'N/A';
+
+      const iconUrl = icon ? `https://openweathermap.org/img/wn/${icon}@2x.png` : '';
+      resultDiv.innerHTML = `
+        <div class="weather-row">
+          <div>
+            <div class="temp">${escapeHtml(temp)}°C</div>
+            <div class="meta">${escapeHtml(desc)} — ${escapeHtml(name)} ${escapeHtml(country)}</div>
+          </div>
+          ${iconUrl ? `<img src="${iconUrl}" alt="${escapeHtml(desc)}" width="80" height="80">` : ''}
+        </div>
+        <div class="small" style="margin-top:10px">
+          Humidity: ${escapeHtml(humidity)}% • Wind: ${escapeHtml(wind)} m/s
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
