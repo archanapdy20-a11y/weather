@@ -30,41 +30,32 @@
       <button id="searchBtn">Search</button>
     </div>
 
-    <div id="status" class="small">Powered by OpenWeatherMap (via backend)</div>
-
+    <div id="status" class="small">Powered by OpenWeatherMap</div>
     <div id="result" class="result" aria-live="polite"></div>
-
     <footer>Tip: use city name (optionally: "city,country")</footer>
   </div>
 
   <script>
+    const apiKey = "YOUR_API_KEY"; // 🔑 Replace with your OpenWeatherMap API key
     const btn = document.getElementById('searchBtn');
     const cityInput = document.getElementById('city');
     const resultDiv = document.getElementById('result');
-    const status = document.getElementById('status');
 
     btn.addEventListener('click', fetchWeather);
     cityInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') fetchWeather(); });
 
     function showError(msg) {
-      resultDiv.innerHTML = `<div class="error">Error: ${escapeHtml(msg)}</div>`;
+      resultDiv.innerHTML = `<div class="error">Error: ${msg}</div>`;
     }
-
-    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
 
     async function fetchWeather(){
       const city = cityInput.value.trim();
       if (!city) { showError('Please enter a city name.'); return; }
       resultDiv.innerHTML = `<div class="small loading">Loading...</div>`;
       try {
-        const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
-        const text = await res.text();
-        if (!res.ok) {
-          // try to extract JSON error
-          try { const json = JSON.parse(text); throw new Error(json.message || json.error || text); } 
-          catch(_) { throw new Error(text || 'Unknown error'); }
-        }
-        const data = JSON.parse(text);
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unknown error');
         renderWeather(data);
       } catch (err) {
         showError(err.message || err);
@@ -72,8 +63,7 @@
     }
 
     function renderWeather(data){
-      // data structure from OpenWeatherMap current weather API
-      if (data?.cod && (data.cod === '404' || data.cod === 404)) {
+      if (data.cod && (data.cod === '404' || data.cod === 404)) {
         showError(data.message || 'City not found');
         return;
       }
@@ -89,13 +79,13 @@
       resultDiv.innerHTML = `
         <div class="weather-row">
           <div>
-            <div class="temp">${escapeHtml(temp)}°C</div>
-            <div class="meta">${escapeHtml(desc)} — ${escapeHtml(name)} ${escapeHtml(country)}</div>
+            <div class="temp">${temp}°C</div>
+            <div class="meta">${desc} — ${name} ${country}</div>
           </div>
-          ${iconUrl ? `<img src="${iconUrl}" alt="${escapeHtml(desc)}" width="80" height="80">` : ''}
+          ${iconUrl ? `<img src="${iconUrl}" alt="${desc}" width="80" height="80">` : ''}
         </div>
         <div class="small" style="margin-top:10px">
-          Humidity: ${escapeHtml(humidity)}% • Wind: ${escapeHtml(wind)} m/s
+          Humidity: ${humidity}% • Wind: ${wind} m/s
         </div>
       `;
     }
